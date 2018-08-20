@@ -12,6 +12,7 @@ if (os.cpu_count() > 8):
     USE_CUDA = True
 else:
     USE_CUDA = False
+#USE_CUDA = True
 MAX_LENGTH = 10
 
 parser = argparse.ArgumentParser(description='Seq_TO_Seq Dialogue bAbI')
@@ -22,6 +23,7 @@ parser.add_argument('-hdd','--hidden', help='Hidden size', required=False)
 parser.add_argument('-bsz','--batch', help='Batch_size', required=False)
 parser.add_argument('-lr','--learn', help='Learning Rate', required=False)
 parser.add_argument('-dr','--drop', help='Drop Out', required=False)
+# in paper Sect.3.2 Training; a trick
 parser.add_argument('-um','--unk_mask', help='mask out input token to UNK', required=False, default=1)
 parser.add_argument('-layer','--layer', help='Layer Number', required=False)
 parser.add_argument('-lm','--limit', help='Word Limit', required=False,default=-10000)
@@ -33,6 +35,7 @@ parser.add_argument('-ep','--entPtr', help='Restrict Ptr only point to entity', 
 parser.add_argument('-evalp','--evalp', help='evaluation period', required=False, default=3)
 parser.add_argument('-an','--addName', help='An add name for the save folder', required=False, default='')
 
+# vars([object]) -> dictionary
 args = vars(parser.parse_args())
 print(args)
 

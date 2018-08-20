@@ -21,8 +21,8 @@ class PTRUNK(nn.Module):
         self.input_size = lang.n_words
         self.output_size = lang.n_words
         self.hidden_size = hidden_size
-        self.max_len = max_len ## max input
-        self.max_r = max_r ## max responce len        
+        self.max_len = max_len  # max input
+        self.max_r = max_r  # max response len
         self.lang = lang
         self.lr = lr
         self.decoder_learning_ratio = 5.0
@@ -48,7 +48,7 @@ class PTRUNK(nn.Module):
         self.loss = 0
         self.loss_gate = 0
         self.loss_ptr = 0
-        self.loss_vac = 0
+        self.loss_vac = 0       # vocab; 作者拼错了
         self.print_every = 1
         # Move models to GPU
         if USE_CUDA:
@@ -58,8 +58,8 @@ class PTRUNK(nn.Module):
     def print_loss(self):
         print_loss_avg = self.loss / self.print_every
         print_loss_gate = self.loss_gate / self.print_every
-        print_loss_ptr =  self.loss_ptr / self.print_every
-        print_loss_vac =  self.loss_vac / self.print_every
+        print_loss_ptr = self.loss_ptr / self.print_every
+        print_loss_vac = self.loss_vac / self.print_every
         self.print_every += 1
         return 'L:{:.2f}, VL:{:.2f},GL:{:.2f}, PL:{:.2f}'.format(print_loss_avg,print_loss_vac,print_loss_gate,print_loss_ptr)
     
@@ -77,7 +77,20 @@ class PTRUNK(nn.Module):
         
     def train_batch(self, input_batches, input_lengths, target_batches, 
                     target_lengths, target_index, target_gate, batch_size, clip,
-                    teacher_forcing_ratio,reset):   
+                    teacher_forcing_ratio,reset):
+        '''
+        :param input_batches:       (T,B)
+        :param input_lengths:       (B,)
+        :param target_batches:      (T,B)
+        :param target_lengths:      (B,)
+        :param target_index:        (T,B)
+        :param target_gate:         (T,B)
+        :param batch_size:          B
+        :param clip:
+        :param teacher_forcing_ratio:
+        :param reset:
+        :return:
+        '''
         if reset:
             self.loss = 0
             self.loss_gate = 0
@@ -88,11 +101,17 @@ class PTRUNK(nn.Module):
         self.encoder_optimizer.zero_grad()
         self.decoder_optimizer.zero_grad()
         loss_Vocab,loss_Ptr,loss_Gate = 0,0,0
+
         # Run words through encoder
+        # **output** (seq_len, batch, hidden_size * num_directions)
+        # **h_n** (num_layers * num_directions, batch, hidden_size)
+        # **c_n** (num_layers * num_directions, batch, hidden_size)
+        # encoder_hidden = (H_n, c_n)
         encoder_outputs, encoder_hidden = self.encoder(input_batches, input_lengths)
       
         # Prepare input and output variables
         decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size))
+        # TODO: encoder可能双向？？ decoder只能单项？？
         decoder_hidden = (encoder_hidden[0][:self.decoder.n_layers],encoder_hidden[1][:self.decoder.n_layers])
         
         max_target_length = max(target_lengths)
@@ -118,25 +137,25 @@ class PTRUNK(nn.Module):
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
                 all_decoder_outputs_gate[t] = gate
-                decoder_input = target_batches[t] # Next input is current target
+                decoder_input = target_batches[t]   # Next input is current target
                 if USE_CUDA: decoder_input = decoder_input.cuda()
                 
         else:
             for t in range(max_target_length):
-                decoder_ptr,decoder_vacab,gate,decoder_hidden = self.decoder(
-                    decoder_input, decoder_hidden, encoder_outputs)
+                decoder_ptr, decoder_vacab, gate, decoder_hidden = self.decoder(
+                                        decoder_input, decoder_hidden, encoder_outputs)
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
                 all_decoder_outputs_gate[t] = gate
-                topv, topvi = decoder_vacab.data.topk(1)
+                topv, topvi = decoder_vacab.data.topk(1)    # (B,1)
                 topp, toppi = decoder_ptr.data.topk(1)
-                ## get the correspective word in input
-                top_ptr_i = torch.gather(input_batches,0,toppi.view(1, -1))
+                # get the correspective word in input
+                top_ptr_i = torch.gather(input_batches,0,Variable(toppi.view(1, -1)))
                 next_in = [top_ptr_i.squeeze()[i].data[0] if(gate.squeeze()[i].data[0]>=0.5) else topvi.squeeze()[i] for i in range(batch_size)]
-                decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
+                decoder_input = Variable(torch.LongTensor(next_in))  # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()
                   
-        #Loss calculation and backpropagation
+        # Loss calculation and backpropagation
         loss_Vocab = masked_cross_entropy(
             all_decoder_outputs_vocab.transpose(0, 1).contiguous(), # -> batch x seq
             target_batches.transpose(0, 1).contiguous(), # -> batch x seq
@@ -147,6 +166,7 @@ class PTRUNK(nn.Module):
             target_index.transpose(0, 1).contiguous(), # -> batch x seq
             target_lengths
         )
+        # 这种形式的loss好像不太好;gate is \in (0,1)
         loss_gate = self.criterion(all_decoder_outputs_gate,target_gate.float())
 
 
@@ -191,15 +211,15 @@ class PTRUNK(nn.Module):
             p.append(elm.split(' '))
         # Run through decoder one time step at a time
         for t in range(self.max_r):
-            decoder_ptr,decoder_vacab,gate,decoder_hidden  = self.decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+            decoder_ptr, decoder_vacab, gate, decoder_hidden = self.decoder(
+                                    decoder_input, decoder_hidden, encoder_outputs)
             all_decoder_outputs_vocab[t] = decoder_vacab
             all_decoder_outputs_ptr[t] = decoder_ptr
             all_decoder_outputs_gate[t] = gate
 
             topv, topvi = decoder_vacab.data.topk(1)
             topp, toppi = decoder_ptr.data.topk(1)
-            top_ptr_i = torch.gather(input_batches,0,toppi.view(1, -1))        
+            top_ptr_i = torch.gather(input_batches,0,Variable(toppi.view(1, -1)))
             next_in = [top_ptr_i.squeeze()[i].data[0] if(gate.squeeze()[i].data[0]>=0.5) else topvi.squeeze()[i] for i in range(batch_size)]
             decoder_input = Variable(torch.LongTensor(next_in)) 
             # Next input is chosen word
@@ -222,10 +242,8 @@ class PTRUNK(nn.Module):
 
         # Set back to training mode
         self.encoder.train(True)
-        self.decoder.train(True)    
-
+        self.decoder.train(True)
         return decoded_words
-
 
     def evaluate(self,dev,avg_best,BLEU=False):
         logging.info("STARTING EVALUATION")
@@ -320,8 +338,8 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.n_layers = n_layers
         self.dropout = dropout       
-        self.embedding = nn.Embedding(input_size, hidden_size)
-        self.embedding_dropout = nn.Dropout(dropout) 
+        self.embedding = nn.Embedding(input_size, hidden_size)  # an instance
+        self.embedding_dropout = nn.Dropout(dropout)            # an instance
         self.lstm = nn.LSTM(hidden_size, hidden_size, n_layers, dropout=self.dropout)
         if USE_CUDA:
             self.lstm = self.lstm.cuda() 
@@ -330,22 +348,47 @@ class EncoderRNN(nn.Module):
 
     def get_state(self, input):
         """Get cell states and hidden states."""
-        batch_size = input.size(1)
+        # input shape (T,B)
+        batch_size = input.size(1)      # B
         c0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))  
-        h0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size)) ### * self.num_directions = 2 if bi
+        # self.n_layers * self.num_directions = 2 if bi
+        h0_encoder = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
         if USE_CUDA:
             h0_encoder = h0_encoder.cuda()
             c0_encoder = c0_encoder.cuda() 
         return (h0_encoder, c0_encoder)
 
     def forward(self, input_seqs, input_lengths, hidden=None):
+
         # Note: we run this all at once (over multiple batches of multiple sequences)
-        embedded = self.embedding(input_seqs)
+        embedded = self.embedding(input_seqs)       # (T,B,E)
         embedded = self.embedding_dropout(embedded)
         hidden = self.get_state(input_seqs)
         if input_lengths:
             embedded = nn.utils.rnn.pack_padded_sequence(embedded, input_lengths, batch_first=False)
-        
+        '''
+        Inputs: input, (h_0, c_0)
+            - **input** (seq_len, batch, input_size): tensor containing the features
+              of the input sequence.
+              The input can also be a packed variable length sequence.
+              See :func:`torch.nn.utils.rnn.pack_padded_sequence` for details.
+            - **h_0** (num_layers \* num_directions, batch, hidden_size): tensor
+              containing the initial hidden state for each element in the batch.
+            - **c_0** (num_layers \* num_directions, batch, hidden_size): tensor
+              containing the initial cell state for each element in the batch.
+
+              If (h_0, c_0) is not provided, both **h_0** and **c_0** default to zero.
+
+        Outputs: output, (h_n, c_n)
+            - **output** (seq_len, batch, hidden_size * num_directions): tensor
+              containing the output features `(h_t)` from the last layer of the RNN,
+              for each t. If a :class:`torch.nn.utils.rnn.PackedSequence` has been
+              given as the input, the output will also be a packed sequence.
+            - **h_n** (num_layers * num_directions, batch, hidden_size): tensor
+              containing the hidden state for t=seq_len
+            - **c_n** (num_layers * num_directions, batch, hidden_size): tensor
+              containing the cell state for t=seq_len
+        '''
         outputs, hidden = self.lstm(embedded, hidden)
         if input_lengths:
             outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=False)   
@@ -356,11 +399,12 @@ class PtrDecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size, n_layers=1, dropout=0.1):
         super(PtrDecoderRNN, self).__init__()
         self.hidden_size = hidden_size
-        self.output_size = output_size ### Vocab size
+        self.output_size = output_size      # Vocab size
         self.n_layers = n_layers
         self.dropout = dropout
         self.embedding = nn.Embedding(output_size, hidden_size)
         self.embedding_dropout = nn.Dropout(dropout)
+        # TODO: encoder 是 bi-LSTM ??
         self.lstm = nn.LSTM(2*hidden_size, hidden_size, n_layers, dropout=dropout)
         self.W1 = nn.Linear(2*hidden_size, hidden_size)
         self.v = nn.Parameter(torch.rand(hidden_size))
@@ -380,34 +424,65 @@ class PtrDecoderRNN(nn.Module):
             self.W = self.W.cuda() 
 
     def forward(self, input_seq, last_hidden, encoder_outputs):
+        '''
+        :param input_seq:               (B,)
+        :param last_hidden:   a tuple of two elem; (num_layers, batch, hidden_size)
+        :param encoder_outputs:  (seq_len, batch, hidden_size * num_directions); num_dir = 1
+        :return:
+        '''
         # Note: we run this one step at a time     
         # Get the embedding of the current input word (last output word)
         max_len = encoder_outputs.size(0)
         batch_size = input_seq.size(0)
         input_seq = input_seq
-        encoder_outputs = encoder_outputs.transpose(0,1)
+        encoder_outputs = encoder_outputs.transpose(0,1)    # shape (B,max_len, H*num_dir)
             
-        word_embedded = self.embedding(input_seq) # S=1 x B x N
+        word_embedded = self.embedding(input_seq)  # S=1 x B x N; 此处还没有1; need to unsqueeze()
         word_embedded = self.embedding_dropout(word_embedded)
 
-        ## ATTENTION CALCULATION 
-        s_t = last_hidden[0][-1].unsqueeze(0)
-        H = s_t.repeat(max_len,1,1).transpose(0,1)
+        # ATTENTION CALCULATION                     last_hidden (H_n, c_n)
+        s_t = last_hidden[0][-1].unsqueeze(0)       # shape (1,B,H)
+        H = s_t.repeat(max_len,1,1).transpose(0,1)  # shape (B,max_len, H)
 
-        energy = F.tanh(self.W1(torch.cat([H,encoder_outputs], 2)))
-        energy = energy.transpose(2,1)
-        v = self.v.repeat(encoder_outputs.data.shape[0],1).unsqueeze(1) #[B*1*H]
-        p_ptr = torch.bmm(v,energy) # [B*1*T]
+        energy = F.tanh(self.W1(torch.cat([H,encoder_outputs], 2)))     # (B,max_len,H)
+        energy = energy.transpose(2,1)                                  # (B,H,max_len)
+        v = self.v.repeat(encoder_outputs.data.shape[0],1).unsqueeze(1) # [B*1*H]
+        p_ptr = torch.bmm(v,energy)   # [B*1*T]
         
-        a = F.softmax(p_ptr)
-        context = a.bmm(encoder_outputs)
+        a = F.softmax(p_ptr)    # dim = len(p_ptr.data.size())-1
+        context = a.bmm(encoder_outputs)    # [B*1*T] * [B,T,H] ---> [B,1,H]
 
         # Combine embedded input word and attended context, run through RNN
-        rnn_input = torch.cat((word_embedded, context.squeeze()), 1).unsqueeze(0)
+        # (1,B,2*H)
+        # TODO: for the case of B = 1
+        rnn_input = torch.cat((word_embedded, context.squeeze(1)), 1).unsqueeze(0)
+        '''
+            Inputs: input, (h_0, c_0)
+                - **input** (seq_len, batch, input_size): tensor containing the features
+                  of the input sequence.
+                  The input can also be a packed variable length sequence.
+                  See :func:`torch.nn.utils.rnn.pack_padded_sequence` for details.
+                - **h_0** (num_layers \* num_directions, batch, hidden_size): tensor
+                  containing the initial hidden state for each element in the batch.
+                - **c_0** (num_layers \* num_directions, batch, hidden_size): tensor
+                  containing the initial cell state for each element in the batch.
+
+                  If (h_0, c_0) is not provided, both **h_0** and **c_0** default to zero.
+
+            Outputs: output, (h_n, c_n)
+                - **output** (seq_len, batch, hidden_size * num_directions): tensor
+                  containing the output features `(h_t)` from the last layer of the RNN,
+                  for each t. If a :class:`torch.nn.utils.rnn.PackedSequence` has been
+                  given as the input, the output will also be a packed sequence.
+                - **h_n** (num_layers * num_directions, batch, hidden_size): tensor
+                  containing the hidden state for t=seq_len
+                - **c_n** (num_layers * num_directions, batch, hidden_size): tensor
+                  containing the cell state for t=seq_len
+        '''
+        # output shape (1,B,H);  为什么squeeze都不写？？
         output, hidden = self.lstm(rnn_input, last_hidden)
-    
         p_vacab = self.U(output)
         
         gate = F.sigmoid(self.W(hidden[0][-1]))
 
-        return p_ptr,p_vacab,gate,hidden
+        return p_ptr, p_vacab, gate, hidden

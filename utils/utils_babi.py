@@ -12,8 +12,12 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
-from utils.config import *
-import logging 
+# from utils.config import *
+try:
+    from utils.config import *
+except:
+    from config import *
+import logging
 import datetime
 
 class Lang:
@@ -50,18 +54,21 @@ class Dataset(data.Dataset):
         self.trg_word2id = trg_word2id
         self.max_len = max_len
 
+    # 当一个类中定义了__getitem__方法，那么它的实例对象便拥有了通过下标来索引的能力。
     def __getitem__(self, index):
         """Returns one data pair (source and target)."""
         src_seq = self.src_seqs[index]
         trg_seq = self.trg_seqs[index]
         index_s = self.index_seqs[index]
         gete_s  = self.gate_seq[index]
+
         src_seq = self.preprocess(src_seq, self.src_word2id, trg=False)
         trg_seq = self.preprocess(trg_seq, self.trg_word2id)
         index_s = self.preprocess_inde(index_s,src_seq)
         gete_s  = self.preprocess_gate(gete_s)
-        
-        return src_seq, trg_seq, index_s, gete_s,self.max_len,self.src_seqs[index],self.trg_seqs[index]
+
+        # idx_seq and words_seq of source and target;
+        return src_seq, trg_seq, index_s, gete_s, self.max_len, self.src_seqs[index], self.trg_seqs[index]
 
     def __len__(self):
         return self.num_total_seqs
@@ -76,8 +83,9 @@ class Dataset(data.Dataset):
             sequence = torch.Tensor(sequence)
         return sequence
 
-    def preprocess_inde(self, sequence,src_seq):
+    def preprocess_inde(self, sequence, src_seq):
         """Converts words to ids."""
+        # TODO: is this a trick ?  I just guess index_seq don't append the $ idx
         sequence = sequence + [len(src_seq)-1]
         sequence = torch.Tensor(sequence)
         return sequence
@@ -88,12 +96,13 @@ class Dataset(data.Dataset):
         sequence = torch.Tensor(sequence)
         return sequence
 
-def collate_fn(data):
+
+def collate_fn(data):       # 校勘
     def merge(sequences,max_len):
-        lengths = [len(seq) for seq in sequences]
-        if (max_len):
+        lengths = [len(seq) for seq in sequences]   # maintain length for mask
+        if (max_len):       # shape(B,T)
             padded_seqs = torch.ones(len(sequences), max_len[0]).long()
-        else:
+        else:       # 因为padded_token 是1.
             padded_seqs = torch.ones(len(sequences), max(lengths)).long()
         for i, seq in enumerate(sequences):
             end = lengths[i]
@@ -101,6 +110,7 @@ def collate_fn(data):
         return padded_seqs, lengths
 
     # sort a list by sequence length (descending order) to use pack_padded_sequence
+    # pack_padded_sequence是pytorch里处理句子长度的方式, x[0]应该是history
     data.sort(key=lambda x: len(x[0]), reverse=True)
     # seperate source and target sequences
     src_seqs, trg_seqs, ind_seqs, gete_s, max_len, src_plain,trg_plain = zip(*data)
@@ -109,7 +119,8 @@ def collate_fn(data):
     trg_seqs, trg_lengths = merge(trg_seqs,None)
     ind_seqs, _ = merge(ind_seqs,None)
     gete_s, _ = merge(gete_s,None)
-    
+
+    # TODO: 转秩操作    ？？  time first or batch first ??
     src_seqs = Variable(src_seqs).transpose(0,1)
     trg_seqs = Variable(trg_seqs).transpose(0,1)
     ind_seqs = Variable(ind_seqs).transpose(0,1)
@@ -127,20 +138,21 @@ def read_langs(file_name, max_line = None):
     # Read the file and split into lines
     data=[]
     context=""
-    u=None
+    u=None      # u for user; r for response
     r=None
     with open(file_name) as fin:
-        cnt_ptr = 0
+        cnt_ptr = 0        # 在回答中有多少词带pointer
         cnt_voc = 0
         max_r_len = 0
-        cnt_lin = 1
+        cnt_lin = 1         # 记录对话样本数
         for line in fin:
             line=line.strip()
-            if line:
+            if line:        # 空行代表一个样本的结束
                 nid, line = line.split(' ', 1)
                 if '\t' in line:
                     u, r = line.split('\t')
-                    context += str(u)+" " 
+                    context += str(u)+" "
+                    # 当前response的对话历史，当前response会添加到下一轮的对话历史中
                     contex_arr = context.split(' ')[LIMIT:]
                     r_index = []
                     gate = []
@@ -158,6 +170,7 @@ def read_langs(file_name, max_line = None):
 
                     if len(r_index) > max_r_len: 
                         max_r_len = len(r_index)
+                    # TODO: why this way ???
                     data.append([" ".join(contex_arr)+"$$$$",r,r_index,gate])
                     context+=str(r)+" " 
                 else:
@@ -165,10 +178,10 @@ def read_langs(file_name, max_line = None):
                     if USEKB:
                         context+=str(r)+" "                    
             else:
-                cnt_lin+=1
+                cnt_lin += 1
                 if(max_line and cnt_lin>=max_line):
                     break
-                context=""
+                context = ""
     max_len = max([len(d[0].split(' ')) for d in data])
     avg_len = sum([len(d[0].split(' ')) for d in data]) / float(len([len(d[0].split(' ')) for d in data]))
     logging.info("Pointer percentace= {} ".format(cnt_ptr/(cnt_ptr+cnt_voc)))
@@ -188,7 +201,7 @@ def get_seq(pairs,lang,batch_size,type,max_len):
         y_seq.append(pair[1])
         ptr_seq.append(pair[2])
         gate_seq.append(pair[3])
-        if(type):
+        if(type):   # for train_data, set true to get vocab
             lang.index_words(pair[0])
             lang.index_words(pair[1])
     
@@ -200,6 +213,7 @@ def get_seq(pairs,lang,batch_size,type,max_len):
     return data_loader
 
 def prepare_data_seq(task,batch_size=100,shuffle=True):
+    # task is an idx.
     file_train = 'data/dialog-bAbI-tasks/dialog-babi-task{}trn.txt'.format(task)
     file_dev = 'data/dialog-bAbI-tasks/dialog-babi-task{}dev.txt'.format(task)
     file_test = 'data/dialog-bAbI-tasks/dialog-babi-task{}tst.txt'.format(task)
@@ -212,9 +226,10 @@ def prepare_data_seq(task,batch_size=100,shuffle=True):
     max_len_test_OOV = 0
     if (int(task) != 6):
         pair_test_OOV,max_len_test_OOV, max_r_test_OOV = read_langs(file_test_OOV, max_line=None)
-    
-    max_len = max(max_len_train,max_len_dev,max_len_test,max_len_test_OOV) +1
-    max_r  = max(max_r_train,max_r_dev,max_r_test,max_r_test_OOV) +1
+
+    # TODO: why + 1
+    max_len = max(max_len_train,max_len_dev,max_len_test,max_len_test_OOV) + 1
+    max_r  = max(max_r_train,max_r_dev,max_r_test,max_r_test_OOV) + 1
     lang = Lang()
     
     train = get_seq(pair_train,lang,batch_size,True,max_len)
@@ -237,3 +252,24 @@ def prepare_data_seq(task,batch_size=100,shuffle=True):
     
     return train, dev, test, testOOV, lang, max_len, max_r
 
+if __name__=='__main__':
+    task = 1
+    file_train = '../data/dialog-bAbI-tasks/dialog-babi-task{}trn.txt'.format(task)
+
+    pair_train, max_len_train, max_r_train = read_langs(file_train, max_line=None)
+
+    max_len = max_len_train + 1
+    batch_size = 100
+    lang = Lang()
+
+    train = get_seq(pair_train, lang, batch_size, True, max_len)
+
+    epoch = 1
+    logging.info("Epoch:{}".format(epoch))
+    # Run the train function
+    import tqdm
+    pbar = tqdm(enumerate(train), total=len(train))
+    for i, data in pbar:
+        logging.info('iter{}'.format(i))
+
+    logging.warning('chenxiuyi')

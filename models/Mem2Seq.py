@@ -22,20 +22,20 @@ class Mem2Seq(nn.Module):
     def __init__(self, hidden_size, max_len, max_r, lang, path, task, lr, n_layers, dropout, unk_mask):
         super(Mem2Seq, self).__init__()
         self.name = "Mem2Seq"
-        self.task = task
-        self.input_size = lang.n_words
-        self.output_size = lang.n_words
-        self.hidden_size = hidden_size
-        self.max_len = max_len ## max input
-        self.max_r = max_r ## max responce len        
-        self.lang = lang
+        self.task = task        # used for save and get metrics
+        self.input_size = lang.n_words      # not used
+        self.output_size = lang.n_words     # used for generate words
+        self.hidden_size = hidden_size      # ENCODER & DECODER
+        self.n_layers = n_layers            # as hops
+        self.max_len = max_len      # max input         ; 在处理时有+1操作     not used
+        self.max_r = max_r          # max response len  ; 在处理时有+1操作     used for eval()
+        self.lang = lang            # index2word; word2idx
         self.lr = lr
-        self.n_layers = n_layers
         self.dropout = dropout
-        self.unk_mask = unk_mask
+        self.unk_mask = unk_mask    # a trick in the paper; mask input as unk
         
-        if path:
-            if USE_CUDA:
+        if path:    # for saved model
+            if USE_CUDA:        # defined in utils.config
                 logging.info("MODEL {} LOADED".format(str(path)))
                 self.encoder = torch.load(str(path)+'/enc.th')
                 self.decoder = torch.load(str(path)+'/dec.th')
@@ -79,7 +79,21 @@ class Mem2Seq(nn.Module):
     def train_batch(self, input_batches, input_lengths, target_batches, 
                     target_lengths, target_index, target_gate, batch_size, clip,
                     teacher_forcing_ratio, conv_seqs, conv_lengths, reset):  
-
+        '''
+        :param input_batches:   (T, B, 3) or something else
+        :param input_lengths:   (B,)    length of each instance in the batch
+        :param target_batches:  (T',B)  T' is the max response length
+        :param target_lengths:  (B,)
+        :param target_index:    (T',B)  as shape of target_batches
+        :param target_gate:     (T,B)       not used
+        :param batch_size:      没有必要的
+        :param clip:
+        :param teacher_forcing_ratio:       # a trick, for sentence generation
+        :param conv_seqs:
+        :param conv_lengths:
+        :param reset:          a flag for the begin of each epoch
+        :return:
+        '''
         if reset:
             self.loss = 0
             self.loss_ptr = 0
@@ -90,17 +104,22 @@ class Mem2Seq(nn.Module):
         # Zero gradients of both optimizers
         self.encoder_optimizer.zero_grad()
         self.decoder_optimizer.zero_grad()
-        loss_Vocab,loss_Ptr= 0,0
+        loss_Vocab, loss_Ptr= 0, 0
 
-        # Run words through encoder
-        decoder_hidden = self.encoder(input_batches).unsqueeze(0)
+        # Run words through encoder; this is h_0 in the paper;
+        # unsqueeze is for GRU as it requires **h_0** (num_layers * num_directions, batch, hidden_size)
+        decoder_hidden = self.encoder(input_batches).unsqueeze(0)    # (B,E) ---> (1,B,E)
+        # TODO: this is Dialog History + KB in the Fig.1 of the paper.
+        # get the embedding
         self.decoder.load_memory(input_batches.transpose(0,1))
 
         # Prepare input and output variables
+        # this is y_0 in the paper. Fig.1
         decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size))
         
-        max_target_length = max(target_lengths)
+        max_target_length = max(target_lengths)     # (just in this batch)may smaller than max_r_len(in all data);
         all_decoder_outputs_vocab = Variable(torch.zeros(max_target_length, batch_size, self.output_size))
+        # input_batches.size(0) is time_length
         all_decoder_outputs_ptr = Variable(torch.zeros(max_target_length, batch_size, input_batches.size(0)))
 
         # Move new Variables to CUDA
@@ -110,110 +129,147 @@ class Mem2Seq(nn.Module):
             decoder_input = decoder_input.cuda()
 
         # Choose whether to use teacher forcing
+        '''
+        https://machinelearningmastery.com/teacher-forcing-for-recurrent-neural-networks/
+        '''
         use_teacher_forcing = random.random() < teacher_forcing_ratio
         
         if use_teacher_forcing:    
             # Run through decoder one time step at a time
             for t in range(max_target_length):
-                decoder_ptr, decoder_vacab, decoder_hidden  = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
+                # decoder_input(in the form of word) shape(B,)   decoder_hidden shape(1,B,E)
+                # (B,M)     (B,V)           (1,B,E or H)
+                decoder_ptr, decoder_vacab, decoder_hidden = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
-                decoder_input = target_batches[t]# Chosen word is next input
+                decoder_input = target_batches[t]   # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()            
         else:
             for t in range(max_target_length):
+                # (B,M)     (B,V)           (1,B,E or H)
                 decoder_ptr, decoder_vacab, decoder_hidden = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
-                _, toppi = decoder_ptr.data.topk(1)
-                _, topvi = decoder_vacab.data.topk(1)
+                '''A tuple of (values, indices) is returned,
+                where the indices are the indices of the elements in the original input tensor'''
+                _, toppi = decoder_ptr.data.topk(1)     # return topk_value, topk_position
+                _, topvi = decoder_vacab.data.topk(1)   # shape (B,1)
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
-                ## get the correspective word in input
+                # get the correspective word in input
+                '''
+                    out[i][j][k] = input[index[i][j][k]][j][k]  # if dim == 0
+                    out[i][j][k] = input[i][index[i][j][k]][k]  # if dim == 1
+                    out[i][j][k] = input[i][j][index[i][j][k]]  # if dim == 2
+                '''
+                # input_batches[:,:,0] shape(M,B)   最后输出的out与index的size是一样的。shape(1,B)
+                # 由top_ptr导出的input
                 top_ptr_i = torch.gather(input_batches[:,:,0],0,Variable(toppi.view(1, -1)))
+                # 因为起始位置为0; 所以长度-1；而且最后元素为$$$$符号,所以小于
                 next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
-                decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
+                # next_in = []
+                # toppi = toppi.squeeze()
+                # top_ptr_i = top_ptr_i.squeeze()
+                # topvi = topvi.squeeze()
+                # for i in range(batch_size):
+                #     if toppi[i] < input_lengths[i]:
+                #         next_in.append(top_ptr_i[i].data[0])
+                #     else:
+                #         next_in.append(topvi[i])    # topvi 就是单词的idx
+                decoder_input = Variable(torch.LongTensor(next_in))     # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()
                   
-        #Loss calculation and backpropagation
+        # Loss calculation and backpropagation
+        '''
+        http://www.studyai.com/article/bba734ff     PyTorch 高维矩阵转置 Transpose 和 Permute
+        '''
         loss_Vocab = masked_cross_entropy(
-            all_decoder_outputs_vocab.transpose(0, 1).contiguous(), # -> batch x seq
-            target_batches.transpose(0, 1).contiguous(), # -> batch x seq
+            all_decoder_outputs_vocab.transpose(0, 1).contiguous(),     # -> batch x seq
+            target_batches.transpose(0, 1).contiguous(),    # -> batch x seq
             target_lengths
         )
+        # target_index is ptr的位置
         loss_Ptr = masked_cross_entropy(
-            all_decoder_outputs_ptr.transpose(0, 1).contiguous(), # -> batch x seq
-            target_index.transpose(0, 1).contiguous(), # -> batch x seq
+            all_decoder_outputs_ptr.transpose(0, 1).contiguous(),   # -> batch x seq
+            target_index.transpose(0, 1).contiguous(),  # -> batch x seq
             target_lengths
         )
 
         loss = loss_Vocab + loss_Ptr
         loss.backward()
-        
+
+        # TODO: not used ??
         # Clip gradient norms
         ec = torch.nn.utils.clip_grad_norm(self.encoder.parameters(), clip)
         dc = torch.nn.utils.clip_grad_norm(self.decoder.parameters(), clip)
+
         # Update parameters with optimizers
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
         self.loss += loss.data[0]
-        self.loss_ptr += loss_Ptr.data[0]
+        self.loss_ptr += loss_Ptr.data[0]       # to get the data in Variable
         self.loss_vac += loss_Vocab.data[0]
         
-    def evaluate_batch(self,batch_size,input_batches, input_lengths, target_batches, target_lengths, target_index,target_gate,src_plain, conv_seqs, conv_lengths):  
+    def evaluate_batch(self, batch_size, input_batches, input_lengths, target_batches, target_lengths,
+                       target_index, target_gate, src_plain, conv_seqs, conv_lengths):
         # Set to not-training mode to disable dropout
-        self.encoder.train(False)
+        self.encoder.train(False)       # equivalently, self.encoder.eval()
         self.decoder.train(False)  
         # Run words through encoder
-        decoder_hidden = self.encoder(input_batches).unsqueeze(0)
+        decoder_hidden = self.encoder(input_batches).unsqueeze(0)   # (1,B,E)
+        # get the embedding
         self.decoder.load_memory(input_batches.transpose(0,1))
 
-        # Prepare input and output variables
+        # Prepare input and output variables        # (B,)
         decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size))
 
         decoded_words = []
         all_decoder_outputs_vocab = Variable(torch.zeros(self.max_r, batch_size, self.output_size))
         all_decoder_outputs_ptr = Variable(torch.zeros(self.max_r, batch_size, input_batches.size(0)))
-        #all_decoder_outputs_gate = Variable(torch.zeros(self.max_r, batch_size))
+        # all_decoder_outputs_gate = Variable(torch.zeros(self.max_r, batch_size))
         # Move new Variables to CUDA
 
         if USE_CUDA:
             all_decoder_outputs_vocab = all_decoder_outputs_vocab.cuda()
             all_decoder_outputs_ptr = all_decoder_outputs_ptr.cuda()
-            #all_decoder_outputs_gate = all_decoder_outputs_gate.cuda()
+            # all_decoder_outputs_gate = all_decoder_outputs_gate.cuda()
             decoder_input = decoder_input.cuda()
-        
+
+        # （word, $u, time）  to get the word seq
         p = []
-        for elm in src_plain:
-            elm_temp = [ word_triple[0] for word_triple in elm ]
-            p.append(elm_temp) 
+        for elm in src_plain:       # shape(B,T,3)
+            elm_temp = [word_triple[0] for word_triple in elm]
+            p.append(elm_temp)      # shape (B,T)
         
-        self.from_whichs = []
-        acc_gate,acc_ptr,acc_vac = 0.0, 0.0, 0.0
+        self.from_whichs = []       # ptr or P_vocab
+        acc_gate, acc_ptr, acc_vac = 0.0, 0.0, 0.0
         # Run through decoder one time step at a time
         for t in range(self.max_r):
-            decoder_ptr,decoder_vacab, decoder_hidden = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
+            # (B,M)     (B,V)           (1,B,E or H)
+            decoder_ptr, decoder_vacab, decoder_hidden = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
             all_decoder_outputs_vocab[t] = decoder_vacab
-            topv, topvi = decoder_vacab.data.topk(1)
+            topv, topvi = decoder_vacab.data.topk(1)        # topv, topp not used
             all_decoder_outputs_ptr[t] = decoder_ptr
             topp, toppi = decoder_ptr.data.topk(1)
+            # shape (1,B)
             top_ptr_i = torch.gather(input_batches[:,:,0],0,Variable(toppi.view(1, -1)))    
             next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
 
-            decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
+            decoder_input = Variable(torch.LongTensor(next_in))  # Chosen word is next input
             if USE_CUDA: decoder_input = decoder_input.cuda()
 
             temp = []
             from_which = []
             for i in range(batch_size):
-                if(toppi.squeeze()[i] < len(p[i])-1 ):
+                # 因为起始位置为0; 所以长度-1；而且最后元素为$$$$符号,所以小于
+                if(toppi.squeeze()[i] < len(p[i])-1):       # p: shape (B,T); actually a list of list
                     temp.append(p[i][toppi.squeeze()[i]])
-                    from_which.append('p')
+                    from_which.append('p')      # from ptr
                 else:
                     ind = topvi.squeeze()[i]
                     if ind == EOS_token:
                         temp.append('<EOS>')
                     else:
                         temp.append(self.lang.index2word[ind])
-                    from_which.append('v')
+                    from_which.append('v')      # from generated vocab
             decoded_words.append(temp)
             self.from_whichs.append(from_which)
         self.from_whichs = np.array(self.from_whichs)
@@ -237,10 +293,9 @@ class Mem2Seq(nn.Module):
         # Set back to training mode
         self.encoder.train(True)
         self.decoder.train(True)
-        return decoded_words #, acc_ptr, acc_vac
+        return decoded_words    # , acc_ptr, acc_vac    # shape (T,B)
 
-
-    def evaluate(self,dev,avg_best,BLEU=False):
+    def evaluate(self, dev, avg_best, BLEU=False):
         logging.info("STARTING EVALUATION")
         acc_avg = 0.0
         wer_avg = 0.0
@@ -249,14 +304,23 @@ class Mem2Seq(nn.Module):
         acc_V = 0.0
         microF1_PRED,microF1_PRED_cal,microF1_PRED_nav,microF1_PRED_wet = [],[],[],[]
         microF1_TRUE,microF1_TRUE_cal,microF1_TRUE_nav,microF1_TRUE_wet = [],[],[],[]
+        # 在whole eval_dataset上计算的
         ref = []
         hyp = []
         ref_s = ""
         hyp_s = ""
-        dialog_acc_dict = {}
-        pbar = tqdm(enumerate(dev),total=len(dev))
+        dialog_acc_dict = {}    # 在whole eval_dataset上计算的
+        pbar = tqdm(enumerate(dev), total=len(dev))
         for j, data_dev in pbar: 
             if args['dataset']=='kvr':
+                '''
+                batch_size,
+                input_batches, input_lengths,
+                target_batches, target_lengths,
+                target_index,target_gate,
+                src_plain,
+                conv_seqs, conv_lengths'''
+                # output shape (T,B)
                 words = self.evaluate_batch(len(data_dev[1]),data_dev[0],data_dev[1],
                                     data_dev[2],data_dev[3],data_dev[4],data_dev[5],data_dev[6], data_dev[-2], data_dev[-1]) 
             else:
@@ -264,22 +328,24 @@ class Mem2Seq(nn.Module):
                         data_dev[2],data_dev[3],data_dev[4],data_dev[5],data_dev[6], data_dev[-4], data_dev[-3])          
             # acc_P += acc_ptr
             # acc_V += acc_vac
-            acc=0
+            acc = 0     # 在one batch里计算的
             w = 0 
             temp_gen = []
 
-            for i, row in enumerate(np.transpose(words)):
+            # Permute the dimensions of an array
+            for i, row in enumerate(np.transpose(words)):   # shape (B,T)
                 st = ''
                 for e in row:
                     if e== '<EOS>': break
-                    else: st+= e + ' '
+                    else: st += e + ' '
                 temp_gen.append(st)
-                correct = data_dev[7][i]  
-                ### compute F1 SCORE  
+                # data_dev[7] may be the correct sentences; shape(B,T)
+                correct = data_dev[7][i]    # this is response sentences
+                # compute F1 SCORE
                 if args['dataset']=='kvr':
                     f1_true,f1_pred = computeF1(data_dev[8][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE += f1_true
-                    microF1_PRED += f1_pred
+                    microF1_PRED += f1_pred     # 全部是1,估计用来做分母的,多余的？？
                     f1_true,f1_pred = computeF1(data_dev[9][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE_cal += f1_true
                     microF1_PRED_cal += f1_pred 
@@ -290,33 +356,35 @@ class Mem2Seq(nn.Module):
                     microF1_TRUE_wet += f1_true
                     microF1_PRED_wet += f1_pred  
                 elif args['dataset']=='babi' and int(self.task)==6:
-                    f1_true,f1_pred = computeF1(data_dev[-2][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
+                    f1_true, f1_pred = computeF1(data_dev[-2][i],st.lstrip().rstrip(),correct.lstrip().rstrip())
                     microF1_TRUE += f1_true
                     microF1_PRED += f1_pred
 
                 if args['dataset']=='babi':
+                    # ID
                     if data_dev[-1][i] not in dialog_acc_dict.keys():
                         dialog_acc_dict[data_dev[-1][i]] = []
                     if (correct.lstrip().rstrip() == st.lstrip().rstrip()):
-                        acc+=1
+                        acc += 1    # 在one batch里计算的
                         dialog_acc_dict[data_dev[-1][i]].append(1)
-                    else:
+                    else:           # 在whole eval_dataset上计算的
                         dialog_acc_dict[data_dev[-1][i]].append(0)
                 else:
                     if (correct.lstrip().rstrip() == st.lstrip().rstrip()):
-                        acc+=1
+                        acc += 1
                 #    print("Correct:"+str(correct.lstrip().rstrip()))
                 #    print("\tPredict:"+str(st.lstrip().rstrip()))
                 #    print("\tFrom:"+str(self.from_whichs[:,i]))
 
-                w += wer(correct.lstrip().rstrip(),st.lstrip().rstrip())
+                w += wer(correct.lstrip().rstrip(), st.lstrip().rstrip())
                 ref.append(str(correct.lstrip().rstrip()))
                 hyp.append(str(st.lstrip().rstrip()))
-                ref_s+=str(correct.lstrip().rstrip())+ "\n"
-                hyp_s+=str(st.lstrip().rstrip()) + "\n"
+                ref_s += str(correct.lstrip().rstrip()) + "\n"
+                hyp_s += str(st.lstrip().rstrip()) + "\n"
 
-            acc_avg += acc/float(len(data_dev[1]))
-            wer_avg += w/float(len(data_dev[1]))            
+            acc_avg += acc/float(len(data_dev[1]))    # len(data_dev[1]) = batch_size
+            wer_avg += w/float(len(data_dev[1]))      # len(dev) = num of batches
+            # TODO: 有点不合理啊; 除以j应该比较合理;
             pbar.set_description("R:{:.4f},W:{:.4f}".format(acc_avg/float(len(dev)),
                                                                     wer_avg/float(len(dev))))
 
@@ -324,7 +392,7 @@ class Mem2Seq(nn.Module):
         if args['dataset']=='babi':
             dia_acc = 0
             for k in dialog_acc_dict.keys():
-                if len(dialog_acc_dict[k])==sum(dialog_acc_dict[k]):
+                if len(dialog_acc_dict[k]) == sum(dialog_acc_dict[k]):
                     dia_acc += 1
             logging.info("Dialog Accuracy:\t"+str(dia_acc*1.0/len(dialog_acc_dict.keys())))
 
@@ -351,7 +419,8 @@ class Mem2Seq(nn.Module):
                 logging.info("MODEL SAVED")
             return acc_avg
 
-def computeF1(entity,st,correct):
+
+def computeF1(entity, st, correct):
     y_pred = [0 for z in range(len(entity))]
     y_true = [1 for z in range(len(entity))]
     for k in st.lstrip().rstrip().split(' '):
@@ -368,10 +437,17 @@ class EncoderMemNN(nn.Module):
         self.embedding_dim = embedding_dim
         self.dropout = dropout
         self.unk_mask = unk_mask
+        # https://blog.csdn.net/xizero00/article/details/51182003
+        '''End to End memory networks'''
         for hop in range(self.max_hops+1):
             C = nn.Embedding(self.num_vocab, embedding_dim, padding_idx=PAD_token)
-            C.weight.data.normal_(0, 0.1)
+            C.weight.data.normal_(0, 0.1)   # C.weight.data get the weights, then normal_ ops
+            '''adds a child module to the current module.
+            The module can be accessed as an attribute using the given name.
+            self._modules['C_'+str(hop)]   # this is embedding C
+            '''
             self.add_module("C_{}".format(hop), C)
+
         self.C = AttrProxy(self, "C_")
         self.softmax = nn.Softmax(dim=1)
         
@@ -382,32 +458,44 @@ class EncoderMemNN(nn.Module):
         else:
             return Variable(torch.zeros(bsz, self.embedding_dim))
 
-
     def forward(self, story):
-        story = story.transpose(0,1)
-        story_size = story.size() # b * m * 3 
-        if self.unk_mask:
+        story = story.transpose(0, 1)
+        story_size = story.size()   # b * m * 3
+        if self.unk_mask:   # mask input as unk;
             if(self.training):
                 ones = np.ones((story_size[0],story_size[1],story_size[2]))
+                # dropout for UNK
+                '''n trials and p probability of success'''
                 rand_mask = np.random.binomial([np.ones((story_size[0],story_size[1]))],1-self.dropout)[0]
                 ones[:,:,0] = ones[:,:,0] * rand_mask
                 a = Variable(torch.Tensor(ones))
                 if USE_CUDA: a = a.cuda()
                 story = story*a.long()
-        u = [self.get_state(story.size(0))]
+        u = [self.get_state(story.size(0))]     # shape(B,E)
         for hop in range(self.max_hops):
-            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1).long()) # b * (m * s) * e
-            embed_A = embed_A.view(story_size+(embed_A.size(-1),)) # b * m * s * e
-            m_A = torch.sum(embed_A, 2).squeeze(2) # b * m * e
+            # https://stackoverflow.com/questions/48915810/pytorch-contiguous
+            '''
+            Where contiguous here means contiguous in memory.
+            So the contiguous function doesn't affect your target tensor at all,
+            it just makes sure that it is stored in a contiguous chunk of memory.
+            '''
+            # - Input: LongTensor `(N, W)`, N = mini-batch, W = number of indices to extract per mini-batch
+            # - Output: `(N, W, embedding_dim)`
+            # note: Embedding input is two dims;
+            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1).long())    # b * (m * s) * e
+            embed_A = embed_A.view(story_size+(embed_A.size(-1),))  # b * m * s * e
+            m_A = torch.sum(embed_A, 2).squeeze(2)  # b * m * e
 
+            # u is a list of state; state shape [B,E]; u is q vector in the paper
+            # expand_as(other)  is same as expand(other.size())
             u_temp = u[-1].unsqueeze(1).expand_as(m_A)
-            prob   = self.softmax(torch.sum(m_A*u_temp, 2))  
+            prob   = self.softmax(torch.sum(m_A*u_temp, 2))         # (b,m)
             embed_C = self.C[hop+1](story.contiguous().view(story.size(0), -1).long())
             embed_C = embed_C.view(story_size+(embed_C.size(-1),)) 
             m_C = torch.sum(embed_C, 2).squeeze(2)
 
             prob = prob.unsqueeze(2).expand_as(m_C)
-            o_k  = torch.sum(m_C*prob, 1)
+            o_k  = torch.sum(m_C*prob, 1)       # (B,E)
             u_k = u[-1] + o_k
             u.append(u_k)   
         return u_k
@@ -426,54 +514,77 @@ class DecoderrMemNN(nn.Module):
             self.add_module("C_{}".format(hop), C)
         self.C = AttrProxy(self, "C_")
         self.softmax = nn.Softmax(dim=1)
+        # an instance of class; init the weights and bias
+        # the forward function is F.linear(input, self.weight, self.bias)
         self.W = nn.Linear(embedding_dim,1)
         self.W1 = nn.Linear(2*embedding_dim,self.num_vocab)
+
         self.gru = nn.GRU(embedding_dim, embedding_dim, dropout=dropout)
 
     def load_memory(self, story):
-        story_size = story.size() # b * m * 3 
+        story_size = story.size()   # b * m * 3
         if self.unk_mask:
             if(self.training):
                 ones = np.ones((story_size[0],story_size[1],story_size[2]))
+                # zero stand for UNK
                 rand_mask = np.random.binomial([np.ones((story_size[0],story_size[1]))],1-self.dropout)[0]
-                ones[:,:,0] = ones[:,:,0] * rand_mask
+                ones[:,:,0] = ones[:, :, 0] * rand_mask
                 a = Variable(torch.Tensor(ones))
                 if USE_CUDA:
                     a = a.cuda()
                 story = story*a.long()
         self.m_story = []
         for hop in range(self.max_hops):
-            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1))#.long()) # b * (m * s) * e
-            embed_A = embed_A.view(story_size+(embed_A.size(-1),)) # b * m * s * e
-            embed_A = torch.sum(embed_A, 2).squeeze(2) # b * m * e
-            m_A = embed_A    
+            # m_A 即 embed_A 依赖 story和Embedding
+            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1))   # .long()) # b * (m * s) * e
+            embed_A = embed_A.view(story_size+(embed_A.size(-1),))  # b * m * s * e
+            embed_A = torch.sum(embed_A, 2).squeeze(2)  # b * m * e
+            m_A = embed_A
+            # TODO: 计算的浪费 ？？ 应该最后计算
+            # 同理, m_C 即 embed_C 依赖 story和Embedding
             embed_C = self.C[hop+1](story.contiguous().view(story.size(0), -1).long())
             embed_C = embed_C.view(story_size+(embed_C.size(-1),)) 
             embed_C = torch.sum(embed_C, 2).squeeze(2)
             m_C = embed_C
             self.m_story.append(m_A)
-        self.m_story.append(m_C)
+        # hop + 1 个elem; elem shape (B,M,E)
+        self.m_story.append(m_C)        # 只保留最后的 m_C
 
     def ptrMemDecoder(self, enc_query, last_hidden):
-        embed_q = self.C[0](enc_query) # b * e
+        '''
+        :param enc_query: this is current input x_t (or previously generated word) in batch form
+        :param last_hidden: this is Eq.(4) h_{t-1} in the paper; 3 dims as required in the GRU docs
+        :return:
+        '''
+        embed_q = self.C[0](enc_query)  # b * e
+        '''
+        Inputs: input, h_0
+            **input** (seq_len, batch, input_size)
+            **h_0** (num_layers * num_directions, batch, hidden_size)
+        Outputs: output, h_n
+            **output** (seq_len, batch, hidden_size * num_directions)
+            **h_n** (num_layers * num_directions, batch, hidden_size)
+        '''
         output, hidden = self.gru(embed_q.unsqueeze(0), last_hidden)
         temp = []
-        u = [hidden[0].squeeze()]   
+        # u is a list; elem is tensor(B,H) if B not equal 1; else elem shape(H,)
+        u = [hidden[0].squeeze()]
         for hop in range(self.max_hops):
-            m_A = self.m_story[hop]
-            if(len(list(u[-1].size()))==1): u[-1] = u[-1].unsqueeze(0) ## used for bsz = 1.
-            u_temp = u[-1].unsqueeze(1).expand_as(m_A)
-            prob_lg = torch.sum(m_A*u_temp, 2)
-            prob_   = self.softmax(prob_lg)
+            m_A = self.m_story[hop]     # (B,M,E)
+            if(len(list(u[-1].size()))==1):     # if the dim of u[-1] is 1
+                u[-1] = u[-1].unsqueeze(0)      # used for bsz = 1. actually there is no the batch dim
+            u_temp = u[-1].unsqueeze(1).expand_as(m_A)      # shape (B,1,E) ---> (B,M,E)
+            prob_lg = torch.sum(m_A*u_temp, 2)          # (B,M)
+            prob_   = self.softmax(prob_lg)             # (B,M)     attention
             m_C = self.m_story[hop+1]
             temp.append(prob_)
-            prob = prob_.unsqueeze(2).expand_as(m_C)
-            o_k  = torch.sum(m_C*prob, 1)
+            prob = prob_.unsqueeze(2).expand_as(m_C)    # (B,M,E)
+            o_k  = torch.sum(m_C*prob, 1)               # (B,E)
             if (hop==0):
-                p_vocab = self.W1(torch.cat((u[0], o_k),1))
+                p_vocab = self.W1(torch.cat((u[0], o_k),1))  # Eq.(5) in paper; shape(B,V)
             u_k = u[-1] + o_k
             u.append(u_k)
-        p_ptr = prob_lg 
+        p_ptr = prob_lg         # the last, actually is logits  shape(B,M)
         return p_ptr, p_vocab, hidden
 
 
@@ -484,8 +595,12 @@ class AttrProxy(object):
     see https://discuss.pytorch.org/t/list-of-nn-module-in-a-nn-module/219/2
     """
     def __init__(self, module, prefix):
-        self.module = module
+        self.module = module    # an instance of NN_model
         self.prefix = prefix
 
+    # to use list
     def __getitem__(self, i):
+        # getattr(object, name[, default]) -> value
         return getattr(self.module, self.prefix + str(i))
+
+

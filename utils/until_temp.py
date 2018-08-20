@@ -12,8 +12,11 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
-from utils.config import *
-import logging 
+try:
+    from utils.config import *
+except:
+    from config import *
+import logging
 import datetime
 
 class Lang:
@@ -81,6 +84,7 @@ class Dataset(data.Dataset):
 
     def preprocess_gate(self, sequence):
         """Converts words to ids."""
+        # 因为最后一个一定是index中句子长度， gate也为0
         sequence = sequence + [0]
         sequence = torch.Tensor(sequence)
         return sequence

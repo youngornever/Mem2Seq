@@ -21,8 +21,8 @@ class VanillaSeqToSeq(nn.Module):
         self.input_size = lang.n_words
         self.output_size = lang.n_words
         self.hidden_size = hidden_size
-        self.max_len = max_len ## max input
-        self.max_r = max_r ## max responce len   
+        self.max_len = max_len  # max input
+        self.max_r = max_r      # max responce len
         self.lang = lang
         self.lr = lr
         self.decoder_learning_ratio = 1.0
@@ -299,6 +299,12 @@ class EncoderRNN(nn.Module):
         return h0_encoder, c0_encoder
 
     def forward(self, input_seqs, input_lengths, hidden=None):
+        '''
+        :param input_seqs:
+        :param input_lengths:
+        :param hidden:
+        :return:
+        '''
         # Note: we run this all at once (over multiple batches of multiple sequences)
         embedded = self.embedding(input_seqs)
         embedded = self.embedding_dropout(embedded)        

@@ -382,7 +382,8 @@ def prepare_data_seq(task, batch_size=100, shuffle=True):
     max_len = max(max_len_train,max_len_dev,max_len_test,max_len_test_OOV) + 1
     max_r  = max(max_r_train,max_r_dev,max_r_test,max_r_test_OOV) + 1
     lang = Lang()
-    
+
+    # 添加语言模型
     train = get_seq(pair_train,lang,batch_size,True,max_len)
     dev   = get_seq(pair_dev,lang,batch_size,False,max_len)
     test  = get_seq(pair_test,lang,batch_size,False,max_len)
@@ -400,7 +401,7 @@ def prepare_data_seq(task, batch_size=100, shuffle=True):
     logging.info("Vocab_size %s " % lang.n_words)
     logging.info("USE_CUDA={}".format(USE_CUDA))
 
-    return train, dev, test, testOOV, lang, max_len, max_r
+    return lang, max_len, max_r
 
 if __name__=='__main__':
     '''-lr=0.001 -layer=1 -hdd=12 -dr=0.0 -dec=Mem2Seq -bsz=2 -ds=babi -t=1 '''

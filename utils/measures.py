@@ -12,6 +12,7 @@ import numpy as np
 
 from six.moves import urllib
 
+
 def wer(r, h):
     """
     This is a function that calculate the word error rate in ASR.
@@ -50,7 +51,8 @@ def wer(r, h):
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""BLEU metric implementation.
+"""
+BLEU metric implementation.
 """
 
 

@@ -26,8 +26,8 @@ class Mem2Seq(nn.Module):
         self.input_size = lang.n_words
         self.output_size = lang.n_words
         self.hidden_size = hidden_size
-        self.max_len = max_len ## max input
-        self.max_r = max_r ## max responce len        
+        self.max_len = max_len  # max input
+        self.max_r = max_r      # max responce len
         self.lang = lang
         self.lr = lr
         self.n_layers = n_layers
@@ -116,10 +116,10 @@ class Mem2Seq(nn.Module):
         if use_teacher_forcing:    
             # Run through decoder one time step at a time
             for t in range(max_target_length):
-                decoder_ptr, decoder_vacab, decoder_hidden  = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
+                decoder_ptr, decoder_vacab, decoder_hidden = self.decoder.ptrMemDecoder(decoder_input, decoder_hidden)
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
-                decoder_input = target_batches[t]# Chosen word is next input
+                decoder_input = target_batches[t]   # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()            
         else:
             for t in range(max_target_length):
@@ -128,13 +128,13 @@ class Mem2Seq(nn.Module):
                 _, topvi = decoder_vacab.data.topk(1)
                 all_decoder_outputs_vocab[t] = decoder_vacab
                 all_decoder_outputs_ptr[t] = decoder_ptr
-                ## get the correspective word in input
+                # get the correspective word in input
                 top_ptr_i = torch.gather(input_batches,0,Variable(toppi.view(1, -1)))
                 next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
-                decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
+                decoder_input = Variable(torch.LongTensor(next_in))  # Chosen word is next input
                 if USE_CUDA: decoder_input = decoder_input.cuda()
                   
-        #Loss calculation and backpropagation
+        # Loss calculation and backpropagation
         loss_Vocab = masked_cross_entropy(
             all_decoder_outputs_vocab.transpose(0, 1).contiguous(), # -> batch x seq
             target_batches.transpose(0, 1).contiguous(), # -> batch x seq
@@ -190,20 +190,20 @@ class Mem2Seq(nn.Module):
             top_ptr_i = torch.gather(input_batches,0,Variable(toppi.view(1, -1)))      
             next_in = [top_ptr_i.squeeze()[i].data[0] if(toppi.squeeze()[i] < input_lengths[i]-1) else topvi.squeeze()[i] for i in range(batch_size)]
 
-            decoder_input = Variable(torch.LongTensor(next_in)) # Chosen word is next input
+            decoder_input = Variable(torch.LongTensor(next_in))  # Chosen word is next input
             if USE_CUDA: decoder_input = decoder_input.cuda()
 
             temp = []
             for i in range(batch_size):
                 if(toppi.squeeze()[i] < len(src_plain[i])-1 ):
-                    temp.append(src_plain[i][toppi.squeeze()[i]]) ## copy from the input
+                    temp.append(src_plain[i][toppi.squeeze()[i]])  # copy from the input
                 else:
                     ind = topvi.squeeze()[i]
                     if ind == EOS_token:
                         temp.append('<EOS>')
                     else:
-                        temp.append(self.lang.index2word[ind]) ## get from vocabulary
-            decoded_words.append(temp)
+                        temp.append(self.lang.index2word[ind])  # get from vocabulary
+            decoded_words.append(temp)      # (T,B) a list of list
 
         # Set back to training mode
         self.encoder.train(True)
@@ -237,9 +237,9 @@ class Mem2Seq(nn.Module):
                     else: st+= e + ' '
                 temp_gen.append(st)
                 correct = " ".join(data_dev[6][i])
-                ### IMPORTANT 
-                ### WE NEED TO COMPARE THE PLAIN STRING, BECAUSE WE COPY THE WORDS FROM THE INPUT 
-                ### ====>> the index in the output gold can be UNK 
+                # IMPORTANT
+                # WE NEED TO COMPARE THE PLAIN STRING, BECAUSE WE COPY THE WORDS FROM THE INPUT
+                # ====>> the index in the output gold can be UNK
                 if (correct.lstrip().rstrip() == st.lstrip().rstrip()):
                     acc+=1
                 w += wer(correct.lstrip().rstrip(),st.lstrip().rstrip())
@@ -281,16 +281,16 @@ class EncoderMemNN(nn.Module):
         else:
             return Variable(torch.zeros(bsz, self.embedding_dim))
 
-
     def forward(self, story):
         u = [self.get_state(story.size(0))]
         for hop in range(self.max_hops):
-            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1).long()) # b * (m * s) * e
+            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1).long())  # b * (m * s) * e
             u_temp = u[-1].unsqueeze(1).expand_as(embed_A)
-            prob   = self.softmax(torch.sum(embed_A*u_temp, 2))  
+            # TODO: 好像不太一样了     可能会重点关注到user信息
+            prob   = self.softmax(torch.sum(embed_A*u_temp, 2))     # (B,M*3)
             embed_C = self.C[hop+1](story.contiguous().view(story.size(0), -1).long())
-            prob = prob.unsqueeze(2).expand_as(embed_C)
-            o_k  = torch.sum(embed_C*prob, 1)
+            prob = prob.unsqueeze(2).expand_as(embed_C)     # (B,M*3) --->(B,M*3,E)
+            o_k  = torch.sum(embed_C*prob, 1)               # (B,E)
             u_k = u[-1] + o_k
             u.append(u_k)   
         return u_k
@@ -315,7 +315,7 @@ class DecoderrMemNN(nn.Module):
     def load_memory(self, story):
         self.m_story = []
         for hop in range(self.max_hops):
-            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1))#.long()) # b * (m * s) * e
+            embed_A = self.C[hop](story.contiguous().view(story.size(0), -1).long())  # b * (m * s) * e
             m_A = embed_A    
             embed_C = self.C[hop+1](story.contiguous().view(story.size(0), -1).long())
             m_C = embed_C
@@ -323,19 +323,20 @@ class DecoderrMemNN(nn.Module):
         self.m_story.append(m_C)
 
     def ptrMemDecoder(self, enc_query, last_hidden):
-        embed_q = self.C[0](enc_query) # b * e
+        embed_q = self.C[0](enc_query)  # b * e
         _, hidden = self.gru(embed_q.unsqueeze(0), last_hidden)
         temp = []
         u = [hidden[0].squeeze()]   
         for hop in range(self.max_hops):
-            m_A = self.m_story[hop]
+            m_A = self.m_story[hop]         # (B,M*3,E)
             u_temp = u[-1].unsqueeze(1).expand_as(m_A)
-            prob_lg = torch.sum(m_A*u_temp, 2)
+            prob_lg = torch.sum(m_A*u_temp, 2)  # (B,M*3)
+            # TODO: 好像不太一样了     可能会重点关注到user信息
             prob_   = self.softmax(prob_lg)
             m_C = self.m_story[hop+1]
             temp.append(prob_)
             prob = prob_.unsqueeze(2).expand_as(m_C)
-            o_k  = torch.sum(m_C*prob, 1)
+            o_k  = torch.sum(m_C*prob, 1)       # (B,E)
             if (hop==0):
                 p_vocab = self.W1(torch.cat((u[0], o_k),1))
             u_k = u[-1] + o_k

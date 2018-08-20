@@ -1,0 +1,6 @@
+Sample:  [['hi', '$u', 't1'], ['hello', '$s', 't1'], ['what', '$s', 't1'], ['can', '$s', 't1'], ['i', '$s', 't1'], ['help', '$s', 't1'], ['you', '$s', 't1'], ['with', '$s', 't1'], ['today', '$s', 't1'], ["i'd", '$u', 't2'], ['like', '$u', 't2'], ['to', '$u', 't2'], ['book', '$u', 't2'], ['a', '$u', 't2'], ['table', '$u', 't2'], ['with', '$u', 't2'], ['indian', '$u', 't2'], ['cuisine', '$u', 't2'], ['in', '$u', 't2'], ['a', '$u', 't2'], ['moderate', '$u', 't2'], ['price', '$u', 't2'], ['range', '$u', 't2'], ['for', '$u', 't2'], ['two', '$u', 't2'], ['people', '$u', 't2'], ['$$$$', '$$$$', '$$$$']] 
+ i'm on it 
+ [26, 26, 26] 
+ [0, 0, 0] 
+ [['hi', '$u', 't1'], ['hello', '$s', 't1'], ['what', '$s', 't1'], ['can', '$s', 't1'], ['i', '$s', 't1'], ['help', '$s', 't1'], ['you', '$s', 't1'], ['with', '$s', 't1'], ['today', '$s', 't1'], ["i'd", '$u', 't2'], ['like', '$u', 't2'], ['to', '$u', 't2'], ['book', '$u', 't2'], ['a', '$u', 't2'], ['table', '$u', 't2'], ['with', '$u', 't2'], ['indian', '$u', 't2'], ['cuisine', '$u', 't2'], ['in', '$u', 't2'], ['a', '$u', 't2'], ['moderate', '$u', 't2'], ['price', '$u', 't2'], ['range', '$u', 't2'], ['for', '$u', 't2'], ['two', '$u', 't2'], ['people', '$u', 't2']] 
+08-15 13:43 Pointer percentace= 0.596483590087073 
