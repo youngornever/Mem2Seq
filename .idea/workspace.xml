@@ -2,18 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="60a260d0-5834-4e1e-9405-9cbeb193ed14" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main_train.py" afterPath="$PROJECT_DIR$/main_train.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/Mem2Seq.py" afterPath="$PROJECT_DIR$/models/Mem2Seq.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/Mem2Seq_NMT.py" afterPath="$PROJECT_DIR$/models/Mem2Seq_NMT.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/enc_PTRUNK.py" afterPath="$PROJECT_DIR$/models/enc_PTRUNK.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/models/enc_vanilla.py" afterPath="$PROJECT_DIR$/models/enc_vanilla.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/config.py" afterPath="$PROJECT_DIR$/utils/config.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/masked_cross_entropy.py" afterPath="$PROJECT_DIR$/utils/masked_cross_entropy.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/measures.py" afterPath="$PROJECT_DIR$/utils/measures.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/until_temp.py" afterPath="$PROJECT_DIR$/utils/until_temp.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/utils_babi.py" afterPath="$PROJECT_DIR$/utils/utils_babi.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/utils_babi_mem2seq.py" afterPath="$PROJECT_DIR$/utils/utils_babi_mem2seq.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils/utils_kvr_mem2seq.py" afterPath="$PROJECT_DIR$/utils/utils_kvr_mem2seq.py" />
     </list>
     <ignored path=".idea/dataSources.local.xml" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -35,22 +25,14 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="dialog-babi-task5trn.txt" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/data/dialog-bAbI-tasks/dialog-babi-task5trn.txt">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="253">
-              <caret line="11" column="49" selection-start-line="11" selection-start-column="49" selection-end-line="11" selection-end-column="49" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="Mem2Seq.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="Mem2Seq.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/models/Mem2Seq.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="391">
-              <caret line="164" column="72" selection-start-line="164" selection-start-column="64" selection-end-line="164" selection-end-column="72" />
-              <folding />
+            <state relative-caret-position="1886">
+              <caret line="411" column="51" selection-start-line="411" selection-start-column="51" selection-end-line="411" selection-end-column="51" />
+              <folding>
+                <element signature="e#3850#10257#0" expanded="false" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -75,41 +57,30 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Mem2Seq_NMT.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/models/Mem2Seq_NMT.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="0">
-              <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding>
-                <element signature="e#0#12#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="enc_PTRUNK.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/models/enc_PTRUNK.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="254">
-              <caret line="204" column="14" selection-start-line="204" selection-start-column="14" selection-end-line="204" selection-end-column="14" />
+            <state relative-caret-position="180">
+              <caret line="304" column="19" selection-start-line="304" selection-start-column="12" selection-end-line="304" selection-end-column="19" />
               <folding>
                 <element signature="e#0#12#0" expanded="true" />
-                <element signature="e#15463#15685#0" expanded="false" />
-                <element signature="e#17390#18753#1" expanded="false" />
-                <element signature="e#19911#20202#0" expanded="false" />
+                <element signature="e#3711#4112#1" expanded="false" />
+                <element signature="e#4143#4325#0" expanded="false" />
+                <element signature="e#15694#15916#0" expanded="false" />
+                <element signature="e#15951#19193#0" expanded="false" />
+                <element signature="e#17250#19193#0" expanded="false" />
+                <element signature="e#17621#18984#1" expanded="false" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="dataloder_reading.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/torch_test/dataloder_reading.py">
+      <file leaf-file-name="measures.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/utils/measures.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="0">
-              <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding>
-                <element signature="e#0#12#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="69">
+              <caret line="15" column="4" selection-start-line="15" selection-start-column="4" selection-end-line="15" selection-end-column="4" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -129,16 +100,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="679">
               <caret line="409" column="8" selection-start-line="409" selection-start-column="8" selection-end-line="409" selection-end-column="8" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="dialog-babi-task6trn.txt" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/data/dialog-bAbI-tasks/dialog-babi-task6trn.txt">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="164">
-              <caret line="24" column="23" selection-start-line="24" selection-start-column="20" selection-end-line="24" selection-end-column="23" />
               <folding />
             </state>
           </provider>
@@ -239,20 +200,6 @@
             </PATH_ELEMENT>
             <PATH_ELEMENT>
               <option name="myItemId" value="utils" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="Mem2Seq" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="Mem2Seq" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="torch_test" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -548,7 +495,7 @@
     <frame x="65" y="24" width="1375" height="876" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.15828957" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.16654164" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Database" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
@@ -588,7 +535,7 @@
           <line>9</line>
         </line-breakpoint>
       </breakpoints>
-      <option name="time" value="1" />
+      <option name="time" value="2" />
     </breakpoint-manager>
     <watches-manager />
   </component>
@@ -704,16 +651,6 @@
           <folding>
             <element signature="e#1#10#0" expanded="false" />
             <element signature="e#1218#1292#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/main_test.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="389">
-          <caret line="47" column="0" selection-start-line="41" selection-start-column="0" selection-end-line="47" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#18#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -909,40 +846,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/models/Mem2Seq_NMT.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#12#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/models/Mem2Seq.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="164" column="72" selection-start-line="164" selection-start-column="64" selection-end-line="164" selection-end-column="72" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/models/enc_vanilla.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="23">
-          <caret line="1" column="13" selection-start-line="1" selection-start-column="7" selection-end-line="1" selection-end-column="13" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/.PyCharm2016.2/system/python_stubs/-359337738/torch/_C/__init__.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-311">
-          <caret line="705" column="4" selection-start-line="705" selection-start-column="4" selection-end-line="705" selection-end-column="4" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/anaconda2/envs/dialog/lib/python3.6/site-packages/torch/nn/modules/rnn.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="679">
@@ -959,25 +862,106 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/models/enc_PTRUNK.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="254">
-          <caret line="204" column="14" selection-start-line="204" selection-start-column="14" selection-end-line="204" selection-end-column="14" />
-          <folding>
-            <element signature="e#0#12#0" expanded="true" />
-            <element signature="e#15463#15685#0" expanded="false" />
-            <element signature="e#17390#18753#1" expanded="false" />
-            <element signature="e#19911#20202#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/torch_test/dataloder_reading.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#0#12#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="897">
+          <caret line="48" column="19" selection-start-line="48" selection-start-column="19" selection-end-line="48" selection-end-column="19" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.PyCharm2016.2/system/python_stubs/-359337738/torch/_C/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="241">
+          <caret line="638" column="18" selection-start-line="638" selection-start-column="18" selection-end-line="638" selection-end-column="18" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/anaconda2/envs/dialog/lib/python3.6/site-packages/torch/nn/modules/linear.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="241">
+          <caret line="36" column="8" selection-start-line="36" selection-start-column="8" selection-end-line="36" selection-end-column="8" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/utils/utils_babi.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="450">
+          <caret line="225" column="20" selection-start-line="225" selection-start-column="4" selection-end-line="225" selection-end-column="20" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/main_test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="205">
+          <caret line="39" column="20" selection-start-line="39" selection-start-column="20" selection-end-line="39" selection-end-column="20" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/enc_PTRUNK.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="304" column="19" selection-start-line="304" selection-start-column="12" selection-end-line="304" selection-end-column="19" />
+          <folding>
+            <element signature="e#0#12#0" expanded="true" />
+            <element signature="e#3711#4112#1" expanded="false" />
+            <element signature="e#4143#4325#0" expanded="false" />
+            <element signature="e#15694#15916#0" expanded="false" />
+            <element signature="e#15951#19193#0" expanded="false" />
+            <element signature="e#17250#19193#0" expanded="false" />
+            <element signature="e#17621#18984#1" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/utils/measures.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="69">
+          <caret line="15" column="4" selection-start-line="15" selection-start-column="4" selection-end-line="15" selection-end-column="4" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/Mem2Seq_NMT.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="552">
+          <caret line="258" column="25" selection-start-line="258" selection-start-column="15" selection-end-line="258" selection-end-column="25" />
+          <folding>
+            <element signature="e#0#12#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/enc_vanilla.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="23">
+          <caret line="1" column="13" selection-start-line="1" selection-start-column="7" selection-end-line="1" selection-end-column="13" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/models/Mem2Seq.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1886">
+          <caret line="411" column="51" selection-start-line="411" selection-start-column="51" selection-end-line="411" selection-end-column="51" />
+          <folding>
+            <element signature="e#3850#10257#0" expanded="false" />
           </folding>
         </state>
       </provider>

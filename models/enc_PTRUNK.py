@@ -142,6 +142,8 @@ class PTRUNK(nn.Module):
                 
         else:
             for t in range(max_target_length):
+                # (B*1*T) (1,B.Out_size)  (B,1)   a tuple of two elem; (num_layers, batch, hidden_size)
+
                 decoder_ptr, decoder_vacab, gate, decoder_hidden = self.decoder(
                                         decoder_input, decoder_hidden, encoder_outputs)
                 all_decoder_outputs_vocab[t] = decoder_vacab
@@ -166,7 +168,7 @@ class PTRUNK(nn.Module):
             target_index.transpose(0, 1).contiguous(), # -> batch x seq
             target_lengths
         )
-        # 这种形式的loss好像不太好;gate is \in (0,1)
+        # FIXME: 这种形式的loss好像不太好;gate is \in (0,1)
         loss_gate = self.criterion(all_decoder_outputs_gate,target_gate.float())
 
 
@@ -227,18 +229,18 @@ class PTRUNK(nn.Module):
 
             temp = []
             for i in range(batch_size):
-                if(gate.squeeze()[i].data[0]>=0.5):
-                    if(toppi.squeeze()[i] >= len(p[i]) ):
+                if(gate.squeeze()[i].data[0]>=0.5):     # generate
+                    if(toppi.squeeze()[i] >= len(p[i])):    # 当生成的时候， 如果ptr大于sentence_end 则结束
                         temp.append('<EOS>')
                     else:
-                        temp.append(p[i][toppi.squeeze()[i]])
+                        temp.append(p[i][toppi.squeeze()[i]])   # 选取
                 else:
                     ind = topvi.squeeze()[i]
                     if ind == EOS_token:
                         temp.append('<EOS>')
                     else:
                         temp.append(self.lang.index2word[ind])
-            decoded_words.append(temp)
+            decoded_words.append(temp)      # (T,B)
 
         # Set back to training mode
         self.encoder.train(True)
@@ -259,12 +261,13 @@ class PTRUNK(nn.Module):
         ref_s = ""
         hyp_s = ""
         pbar = tqdm(enumerate(dev),total=len(dev))
-        for j, data_dev in pbar: 
+        for j, data_dev in pbar:
+            # (T,B) a list of list
             words = self.evaluate_batch(len(data_dev[1]),data_dev[0],data_dev[1],data_dev[2],data_dev[3],data_dev[4],data_dev[5],data_dev[6])            
             acc=0
             w = 0
             temp_gen = []
-            for i, row in enumerate(np.transpose(words)):
+            for i, row in enumerate(np.transpose(words)):       # (B,T)
                 st = ''
                 for e in row:
                     if e== '<EOS>':
@@ -481,8 +484,8 @@ class PtrDecoderRNN(nn.Module):
         '''
         # output shape (1,B,H);  为什么squeeze都不写？？
         output, hidden = self.lstm(rnn_input, last_hidden)
-        p_vacab = self.U(output)
+        p_vacab = self.U(output)        # (1,B,Out_size)  ???
         
-        gate = F.sigmoid(self.W(hidden[0][-1]))
-
+        gate = F.sigmoid(self.W(hidden[0][-1]))     # (B,1)
+        # # (B*1*T) (1,B.Out_size)  (B,1)   a tuple of two elem; (num_layers, batch, hidden_size)
         return p_ptr, p_vacab, gate, hidden
